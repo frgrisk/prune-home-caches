@@ -79,10 +79,13 @@ jobs:
             # verbatim. It is not a format string.
             ${{ vars.CLAUDE_REVIEW_COMMAND || format('/mattpocock-skills:code-review origin/{0}', github.event.pull_request.base.ref) }}
 
-            For the Spec axis, the spec is this pull request's own description,
-            read with `gh pr view ${{ github.event.pull_request.number }} --json title,body`.
-            If it doesn't state what was asked for, report the spec as
-            unavailable rather than inferring it from the diff.
+            For the Spec axis, the spec is the GitHub issue this pull request
+            closes. Find it with
+            `gh pr view ${{ github.event.pull_request.number }} --json title,body,closingIssuesReferences`,
+            then read each referenced issue with `gh issue view <number> --comments`.
+            When the PR closes no issue, fall back to its own description. If
+            neither states what was asked for, report the spec as unavailable
+            rather than inferring it from the diff.
 
             The skill's rule about skipping what tooling already enforces
             applies to the pre-commit check on this PR, this repo's only gate:
