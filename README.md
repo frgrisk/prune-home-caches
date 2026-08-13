@@ -91,11 +91,17 @@ sudo dnf remove prune-home-caches      # disables the timer cleanly
 
 After installing, confirm `systemctl list-timers` shows a non-empty `NEXT`. Empty means it will never fire.
 
-Build the RPM on any host with `rpm-build`:
+Build the RPM on any host with `rpm-build`. The spec takes a source tarball, so produce one from the checkout
+first:
 
 ```bash
+mkdir -p rpmbuild/SOURCES
+git archive --format=tar.gz --prefix=prune-home-caches-1.0.0/ \
+    -o rpmbuild/SOURCES/prune-home-caches-1.0.0.tar.gz HEAD
 rpmbuild --define "_topdir $PWD/rpmbuild" -bb rpm/prune-home-caches.spec
 ```
+
+The prefix must match `%{name}-%{version}`, or `%setup` won't find the tree.
 
 ### Installed paths
 
@@ -104,6 +110,7 @@ rpmbuild --define "_topdir $PWD/rpmbuild" -bb rpm/prune-home-caches.spec
 /usr/sbin/test-prune-home-caches.sh             # test harness
 /usr/lib/systemd/system/prune-home-caches.*     # unit files (package-owned)
 /usr/share/doc/prune-home-caches/README.md      # this document
+/usr/share/licenses/prune-home-caches/LICENSE   # MIT
 ```
 
 The service is sandboxed: `ProtectSystem=strict` plus `ReadWritePaths=/home` means a bug cannot write outside

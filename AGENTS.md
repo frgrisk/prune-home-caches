@@ -10,8 +10,9 @@ so every agent reads the same thing.
   description, so write them as the permanent commit message.
 - **Copyright headers**: added by the `addlicense` pre-commit hook. Never write
   them by hand.
-- **Python**: managed with **uv**. Never pip, never Poetry, and never
-  `pip install --break-system-packages`.
+- **Shell**: `bash-defensive-patterns` is the bar, and `shellcheck` runs as a
+  pre-commit hook. See [Shell conventions](#shell-conventions) below for what
+  that means in practice.
 - **Pre-commit**: `make pre-commit-install` once per clone; `make pre-commit` to
   run every hook. `make` lists all targets.
 

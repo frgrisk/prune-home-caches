@@ -1,0 +1,23 @@
+[Unit]
+Description=Weekly prune of stale build caches on /home
+
+[Timer]
+OnCalendar=Sun *-*-* 03:30:00
+
+# If the machine was powered off at the scheduled time, run once shortly
+# after the next boot instead of silently skipping the week.
+Persistent=true
+
+# Spread the start so a fleet of hosts does not all wake at once. This also
+# serves as the grace period for a Persistent= catch-up run after boot.
+RandomizedDelaySec=15min
+
+# Do NOT add OnBootSec here: it is a monotonic trigger, so on a host that
+# booted long ago it elapses immediately on activation and suppresses the
+# OnCalendar schedule. Persistent=true already covers missed runs.
+
+AccuracySec=1min
+Unit=prune-home-caches.service
+
+[Install]
+WantedBy=timers.target

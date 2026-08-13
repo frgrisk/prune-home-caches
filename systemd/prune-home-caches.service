@@ -1,0 +1,27 @@
+[Unit]
+Description=Prune stale VS Code server builds and Claude Code binaries on /home
+Documentation=file:/usr/sbin/prune-home-caches.sh
+ConditionPathIsMountPoint=/home
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/prune-home-caches.sh --age-days 30
+
+# Be gentle: this walks a lot of inodes on a shared box.
+Nice=10
+IOSchedulingClass=idle
+
+# Least privilege: the only thing it may modify is /home.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+# ProtectHome must stay 'no' — the whole job is to write under /home.
+# ProtectSystem=strict already makes everything read-only except ReadWritePaths.
+ProtectHome=no
+ReadWritePaths=/home
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+
+# Intentionally no [Install] section: this unit is triggered only by
+# prune-home-caches.timer. Enabling it directly would run it at every boot.

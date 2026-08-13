@@ -89,9 +89,15 @@ jobs:
 
             The skill's rule about skipping what tooling already enforces
             applies to the pre-commit check on this PR, this repo's only gate:
-            ruff, markdownlint, gitleaks, addlicense, the uv lock hook and the
-            file hygiene hooks. Don't re-run them and don't report what they
-            already catch. Review what they can't.
+            markdownlint, gitleaks, addlicense, shellcheck, ruff, the uv lock
+            hook and the file hygiene hooks. Don't re-run them and don't report
+            what they already catch. Review what they can't.
+
+            One exception. shellcheck is gated at `--severity=error`, so
+            warning and note level shell findings are yours to report, not the
+            hook's. `.pre-commit-config.yaml` records the six that were
+            outstanding when the tool was imported; a new one in changed code
+            is worth raising.
 
             You can read that check's result and logs for this PR. Use that to
             see what it already caught, so you can skip it. Its pass or fail
@@ -110,6 +116,6 @@ jobs:
           # because it runs as its own check and the prompt says to skip it. Add
           # an entry when a denied command costs the reviewer a fact it then
           # reports as uncertainty.
-          claude_args: ${{ vars.CLAUDE_ARGS || format('--model {0} --allowedTools "Skill,Task,Agent,WebFetch,WebSearch,Bash(gh:*),Bash(git:*),Bash(jq:*),Bash(grep:*),Bash(rg:*),Bash(find:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(sort:*),Bash(uniq:*),Bash(cut:*),Bash(sed:*),Bash(echo:*)"', vars.CLAUDE_MODEL || 'claude-opus-5') }}
+          claude_args: ${{ vars.CLAUDE_ARGS || format('--model {0} --allowedTools "Skill,Task,Agent,WebFetch,WebSearch,Bash(gh:*),Bash(git:*),Bash(jq:*),Bash(grep:*),Bash(rg:*),Bash(find:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(sort:*),Bash(uniq:*),Bash(cut:*),Bash(sed:*),Bash(echo:*),Bash(shellcheck:*),Bash(rpmspec:*)"', vars.CLAUDE_MODEL || 'claude-opus-5') }}
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
