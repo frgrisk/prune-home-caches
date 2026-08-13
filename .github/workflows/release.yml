@@ -1,0 +1,166 @@
+# Copyright 2026 The Financial Risk Group, Inc.
+
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  # Builds and verifies without publishing, so the packaging can be exercised
+  # without spending a version number on it.
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and verify RPM
+    runs-on: ubuntu-latest
+    # The package is noarch but its dist tag, dependency names and systemd
+    # layout are EL9's, so it is built where it will be installed.
+    container: almalinux:9
+    permissions:
+      contents: read
+    steps:
+      # Before checkout: the base image has no git, so actions/checkout would
+      # fall back to a REST tarball and `git archive` would have no repository
+      # to read. sudo is here for the test harness, which re-invokes the script
+      # through `sudo -E` even when already root.
+      #
+      # coreutils is deliberately absent despite the script depending on it. The
+      # base image ships coreutils-single, which provides the same binaries and
+      # conflicts with coreutils, so naming it here fails the install outright.
+      - name: Install build and test dependencies
+        run: |
+          dnf -y install --setopt=install_weak_deps=False \
+            git rpm-build sudo procps-ng \
+            tar gzip systemd findutils gawk
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Trust the workspace
+        # The container runs as root while the checkout is owned by the runner
+        # user, which git reads as dubious ownership and refuses to act on.
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Resolve version
+        id: version
+        run: |
+          spec_version="$(awk '/^Version:/ {print $2; exit}' rpm/prune-home-caches.spec)"
+          echo "spec=$spec_version" >>"$GITHUB_OUTPUT"
+
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            tag_version="${GITHUB_REF_NAME#v}"
+            if [[ "$tag_version" != "$spec_version" ]]; then
+              echo "::error title=Tag does not match spec::Tag $GITHUB_REF_NAME implies version $tag_version, but rpm/prune-home-caches.spec declares $spec_version. Bump Version and add a %changelog entry, or retag."
+              exit 1
+            fi
+          fi
+
+      - name: Run test harness
+        # Builds a fixture under mktemp -d and drives the real script at it
+        # through the HOME_MOUNT override, so it never touches the container's
+        # /home. Expect 25 assertions.
+        run: ./src/test-prune-home-caches.sh ./src/prune-home-caches.sh
+
+      - name: Build RPM
+        env:
+          VERSION: ${{ steps.version.outputs.spec }}
+        run: |
+          mkdir -p rpmbuild/SOURCES
+          # The prefix has to be %{name}-%{version} or %setup cannot find the
+          # tree it just unpacked.
+          git archive --format=tar.gz \
+            --prefix="prune-home-caches-${VERSION}/" \
+            -o "rpmbuild/SOURCES/prune-home-caches-${VERSION}.tar.gz" HEAD
+          rpmbuild --define "_topdir $PWD/rpmbuild" -bb rpm/prune-home-caches.spec
+
+          rpm_path="$(find rpmbuild/RPMS -name '*.noarch.rpm' -print -quit)"
+          if [[ -z "$rpm_path" ]]; then
+            echo "::error title=No RPM produced::rpmbuild reported success but rpmbuild/RPMS holds no noarch package."
+            exit 1
+          fi
+          echo "RPM_PATH=$rpm_path" >>"$GITHUB_ENV"
+
+      - name: Install the built RPM
+        # Installing here is what makes the two checks below meaningful, and it
+        # exercises %post at the same time. Its systemctl calls are all guarded
+        # with `|| :`, so no PID 1 in the container is fine.
+        run: dnf -y install "$RPM_PATH"
+
+      - name: Verify packaged units
+        # Required, not belt-and-braces. An invalid value for a unit directive is
+        # ignored with only a warning at load time, so ProtectHome=read-write
+        # once silently disabled the sandbox, and this is the only check that
+        # fails on it.
+        #
+        # Runs after the install rather than against systemd/ in the checkout,
+        # because ExecStart names an absolute path. Verified before the package
+        # is laid down, every run fails with "Command /usr/sbin/... is not
+        # executable" whether or not the units are actually sound.
+        run: |
+          systemd-analyze verify \
+            /usr/lib/systemd/system/prune-home-caches.service \
+            /usr/lib/systemd/system/prune-home-caches.timer
+
+      - name: Verify ExecStart resolves to a packaged path
+        # Nothing in rpmbuild cross-checks the units against %files, and the
+        # first build of this package shipped ExecStart=/usr/local/sbin/... for a
+        # script installed to /usr/sbin, which would have failed on every host at
+        # first run.
+        run: |
+          exec_start="$(awk -F= '/^ExecStart=/ {split($2, a, " "); print a[1]; exit}' \
+            /usr/lib/systemd/system/prune-home-caches.service)"
+
+          if ! rpm -ql prune-home-caches | grep -Fxq "$exec_start"; then
+            echo "::error title=ExecStart is not packaged::The service starts $exec_start, which is absent from the package's file list. Align ExecStart with the %install destination in the spec."
+            rpm -ql prune-home-caches
+            exit 1
+          fi
+
+          echo "ExecStart=$exec_start is packaged and executable"
+
+      - name: Summarize package contents
+        run: |
+          {
+            echo "### $(basename "$RPM_PATH")"
+            echo
+            rpm -qi prune-home-caches | grep -E '^(Version|Release|License|URL)'
+            echo
+            echo '```text'
+            rpm -ql prune-home-caches
+            echo '```'
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: rpm
+          path: rpmbuild/RPMS/noarch/*.rpm
+          if-no-files-found: error
+
+  publish:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: rpm
+          path: dist
+
+      # gh is preinstalled on the runner image, so publishing needs no
+      # third-party action and no container.
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.rpm \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes

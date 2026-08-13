@@ -57,19 +57,17 @@ repos:
   # shellcheck-py ships a prebuilt binary through pip, so this needs no Docker
   # daemon the way koalaman/shellcheck-precommit does.
   #
-  # Gated at `error` deliberately. shellcheck had never run against this code
-  # when it was imported, and the first pass found six things, none of them
-  # errors: SC2009 on the `ps | grep` in collect_inuse_paths, which is the
-  # documented way that function extracts matched paths and cannot become
-  # pgrep; SC2034 for an unused `line` in prune_vscode_builds' local
-  # declaration; and four SC2015 `A && B || C` notes in the test harness, where
-  # it is the intended control flow. Raising this to `warning` means dealing
-  # with SC2034 first.
+  # Gated at `warning`, which the tree is clean against. Below that threshold
+  # sit five accepted notes: SC2009 on the `ps | grep` in collect_inuse_paths,
+  # which is how that function extracts matched paths and so cannot become
+  # pgrep, and four SC2015 `A && B || C` notes in the test harness, where it is
+  # the intended control flow. Dropping to `--severity=info` means suppressing
+  # those five individually first.
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.11.0.1
     hooks:
       - id: shellcheck
-        args: ["--severity=error"]
+        args: ["--severity=warning"]
 
   # The hook keeps its default `types: [markdown]` matching rather than a
   # `files: ^docs/` scope, so root-level README.md and AGENTS.md are linted

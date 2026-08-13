@@ -93,11 +93,10 @@ jobs:
             hook and the file hygiene hooks. Don't re-run them and don't report
             what they already catch. Review what they can't.
 
-            One exception. shellcheck is gated at `--severity=error`, so
-            warning and note level shell findings are yours to report, not the
-            hook's. `.pre-commit-config.yaml` records the six that were
-            outstanding when the tool was imported; a new one in changed code
-            is worth raising.
+            One exception. shellcheck is gated at `--severity=warning`, so
+            note and info level shell findings are yours to report, not the
+            hook's. `.pre-commit-config.yaml` records the five notes that are
+            accepted standing; a new one in changed code is worth raising.
 
             You can read that check's result and logs for this PR. Use that to
             see what it already caught, so you can skip it. Its pass or fail

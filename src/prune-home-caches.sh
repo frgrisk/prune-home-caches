@@ -2,7 +2,7 @@
 # Copyright 2026 The Financial Risk Group, Inc.
 
 #
-# prune-home-caches.sh — reclaim space on /home.
+# prune-home-caches.sh: reclaim space on /home.
 #
 # Three stages:
 #   builds    stale VS Code Remote server builds + Claude Code binaries
@@ -15,8 +15,8 @@
 #   3. only remove items untouched for at least --age-days days
 #   4. for Claude Code, always keep the target of ~/.local/bin/claude
 #
-# The cache and modcache stages are intentionally unconditional — no age gate
-# and no in-use check. Both hold regenerable data, and at a weekly cadence a
+# The cache and modcache stages are intentionally unconditional, with no age
+# gate and no in-use check. Both hold regenerable data, and at a weekly cadence a
 # cache miss was judged cheaper than the bookkeeping. Accepted consequences:
 #   - a full modcache wipe drops cache/download too, so every Go build after a
 #     run re-fetches all dependencies from GOPROXY (network required)
@@ -336,7 +336,7 @@ empty_directory_contents() {
         return 0
     fi
 
-    log_warn "failed to fully clear $label: $dir${err:+ — ${err%%$'\n'*}}"
+    log_warn "failed to fully clear $label: $dir${err:+ - ${err%%$'\n'*}}"
     printf '0\n'
     return 0
 }
@@ -348,7 +348,7 @@ empty_directory_contents() {
 prune_vscode_builds() {
     local -r now="$1"
     local removed=0
-    local home base sub dir newest line mtime path age_days
+    local home base sub dir newest mtime path age_days
 
     for home in "${TARGET_HOMES[@]}"; do
         base="$home/.vscode-server"

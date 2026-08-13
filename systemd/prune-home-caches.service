@@ -15,7 +15,7 @@ IOSchedulingClass=idle
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
-# ProtectHome must stay 'no' — the whole job is to write under /home.
+# ProtectHome must stay 'no': the whole job is to write under /home.
 # ProtectSystem=strict already makes everything read-only except ReadWritePaths.
 ProtectHome=no
 ReadWritePaths=/home

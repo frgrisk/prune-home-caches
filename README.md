@@ -82,12 +82,15 @@ Opt out per stage with `--no-cache` / `--no-modcache`.
 
 ## Deploying to a host
 
-Install enables the timer automatically:
+Install enables the timer automatically. Take the package straight from a release:
 
 ```bash
-sudo dnf install ./prune-home-caches-1.0.0-1.el9.noarch.rpm
+sudo dnf install https://github.com/frgrisk/prune-home-caches/releases/download/v1.0.0/prune-home-caches-1.0.0-1.el9.noarch.rpm
 sudo dnf remove prune-home-caches      # disables the timer cleanly
 ```
+
+The asset name carries the version, so the URL pins a tag rather than tracking `latest`. `gh release download
+v1.0.0 --repo frgrisk/prune-home-caches` fetches it without hand-writing the path.
 
 After installing, confirm `systemctl list-timers` shows a non-empty `NEXT`. Empty means it will never fire.
 
@@ -102,6 +105,13 @@ rpmbuild --define "_topdir $PWD/rpmbuild" -bb rpm/prune-home-caches.spec
 ```
 
 The prefix must match `%{name}-%{version}`, or `%setup` won't find the tree.
+
+### Cutting a release
+
+Pushing a `v*` tag builds the RPM in an `almalinux:9` container, installs it, verifies the units and the
+packaged `ExecStart` path, then attaches the package to a GitHub release. The tag must match `Version` in the
+spec, or the build stops before publishing anything. Run the workflow manually to exercise the build without
+spending a version number.
 
 ### Installed paths
 

@@ -105,7 +105,7 @@ assert_absent "$u/.vscode-server/cli/servers/Stable-old2" "second stale build re
 assert_exists "$u/.vscode-server/bin/binnew"              "newest bin build kept"
 assert_absent "$u/.vscode-server/bin/binold"              "stale bin build removed"
 
-# claude stage — the -e vs -d trap
+# claude stage: the -e vs -d trap
 assert_exists "$u/.local/share/claude/versions/2.9.9" "active claude version kept"
 assert_absent "$u/.local/share/claude/versions/2.0.0" "old claude version removed"
 assert_absent "$u/.local/share/claude/versions/1.0.0" "oldest claude version removed"
@@ -119,7 +119,7 @@ cache_after="$(stat -c '%U:%G:%a' "$u/.cache")"
 [[ "$cache_before" == "$cache_after" ]] && ok "cache ownership/mode preserved ($cache_after)" \
                                         || bad "cache ownership/mode CHANGED: $cache_before -> $cache_after"
 
-# modcache stage — read-only files must still be removed
+# modcache stage: read-only files must still be removed
 assert_exists "$u/go/pkg/mod"                          "modcache directory preserved"
 assert_absent "$u/go/pkg/mod/example.com@v1.0.0"       "read-only module dir removed"
 assert_absent "$u/go/pkg/mod/cache/download"           "download cache removed"

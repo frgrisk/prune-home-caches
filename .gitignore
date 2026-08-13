@@ -27,6 +27,11 @@ dist/
 build/
 *.egg-info/
 
+# RPM builds. README.md and the release workflow both point rpmbuild's _topdir
+# at ./rpmbuild, so a local build drops SOURCES/BUILD/RPMS into the checkout.
+rpmbuild/
+*.rpm
+
 # Node
 node_modules/
 
