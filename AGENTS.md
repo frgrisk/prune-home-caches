@@ -20,7 +20,7 @@ so every agent reads the same thing.
 
 This repo versions and packages `prune-home-caches`, a bash tool that reclaims disk space on the `/home` mount of
 shared development servers. The tool is finished, tested, and running in production, where its first full run
-took a 100G `/home` from 94% to 56%. **The work here is packaging and distribution, not development.** Don't
+took a shared `/home` from 94% to 56%. **The work here is packaging and distribution, not development.** Don't
 rewrite, refactor or "improve" the script, units, tests or spec.
 
 It prunes in three stages:
@@ -38,8 +38,8 @@ The script needs only bash ≥ 4.2, GNU coreutils, GNU findutils (`find -printf`
 under `/home`.
 
 The spec builds natively on EL8, EL9 and EL10, each picking up its own dist tag, and the el9 package installs
-and passes on all three. Verified on AlmaLinux 8.10, 9.8 and 10.2: units verify, 25 assertions pass. Production
-use is EL9, and releases publish the el9 build. Don't widen the claim past EL10 without testing there.
+and passes on all three: units verify, 25 assertions pass. Releases publish the el9 build. Don't widen the
+claim past EL10 without testing there.
 
 ### Layout
 

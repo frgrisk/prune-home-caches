@@ -3,8 +3,8 @@
 Reclaims disk space on the `/home` mount of shared development servers. Ships as a noarch RPM that installs a
 weekly systemd timer.
 
-It was written for a 100G `/home` that had hit 94%. The cause was tooling caches, not user data. The first full
-run took that mount to 56%, freeing 39G.
+It was written for a shared `/home` that had hit 94% full. The cause was tooling caches, not user data. The
+first full run took it to 56%.
 
 ## Requirements
 
@@ -12,8 +12,8 @@ The script itself needs only bash ≥ 4.2, GNU coreutils, GNU findutils (it uses
 assumes user home directories live under `/home`.
 
 Packaging is a noarch RPM, and the spec builds on EL8, EL9 and EL10, each taking its own dist tag. Releases
-publish the el9 build, which installs cleanly on all three: verified on AlmaLinux 8.10, 9.8 and 10.2, where the
-units verify and all 25 assertions pass. Production use is EL9.
+publish the el9 build, which installs cleanly on all three, with the units verifying and all 25 assertions
+passing.
 
 On a systemd distro outside that family, install `src/prune-home-caches.sh` and the two units by hand. Nothing
 in them is RHEL-specific.
@@ -40,15 +40,18 @@ because everything there regenerates.
 
 ## Why /home fills up
 
-VS Code Remote never garbage-collects server builds. It keeps one directory per release, ~380MB each, forever.
-On the host this was written for there were 85 of them across 18 users. Same pattern for the Claude Code extension.
+VS Code Remote never garbage-collects server builds. It keeps one directory per release, ~380MB each, forever,
+and they accumulate per user. Same pattern for the Claude Code extension.
 
-| Reclaimed               |         |
-| ----------------------- | ------- |
-| VS Code + Claude builds | 17G     |
-| `~/.cache`              | 7.9G    |
-| `~/go/pkg/mod`          | 8.5G    |
-| **Total**               | **39G** |
+Where the space went on the host this was written for:
+
+| Share of reclaimed space |      |
+| ------------------------ | ---- |
+| VS Code + Claude builds  | ~45% |
+| `~/go/pkg/mod`           | ~22% |
+| `~/.cache`               | ~20% |
+
+The remainder was smaller caches, not itemized. Measure your own with `--dry-run` before deploying.
 
 ---
 
