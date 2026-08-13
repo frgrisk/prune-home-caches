@@ -1,0 +1,93 @@
+{
+  "skill_name": "frg-brand-materials",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "I need to put together a 5-slide pitch deck for a meeting next week with the CRO of a mid-size regional bank. They're currently using legacy on-prem risk systems and we want to show them why VOR Stream is a better fit. Can you create the pptx?",
+      "expected_output": "A .pptx file with 5 slides using FRG brand colors (black/white/lime #93C30B), correct typography (serif headings, sans-serif body), proper FRG messaging about cloud-native SaaS differentiation, and content tailored to an Economic Buyer persona (CRO).",
+      "files": [],
+      "assertions": [
+        {
+          "id": "slide-count",
+          "text": "Presentation has approximately 5 slides (4-6 acceptable)"
+        },
+        {
+          "id": "brand-color-lime",
+          "text": "Uses FRG lime green (#93C30B or close variant) somewhere in the presentation"
+        },
+        {
+          "id": "cro-targeting",
+          "text": "Content includes language targeting economic buyers: mentions ROI, cost savings, efficiency, compliance, risk reduction, or total cost of ownership"
+        },
+        {
+          "id": "vor-stream-mention",
+          "text": "References 'VOR Stream' by name at least once"
+        },
+        {
+          "id": "saas-differentiation",
+          "text": "Mentions cloud-native, SaaS, or cloud-based as a differentiator"
+        },
+        {
+          "id": "serif-headings",
+          "text": "Uses a serif font (Chronicle, Libre Baskerville, Georgia, or Times) for at least some headings"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "We're presenting at a risk management conference next month and I need a polished 8-slide presentation that introduces FRG as a company — who we are, what we do, our products, and why we're different. Make it look really professional. Save it as a pptx.",
+      "expected_output": "A .pptx file with ~8 slides covering FRG overview, mission/vision, VOR product suite, differentiation, and contact. Should use FRG brand colors, photography style guidance, approved messaging, and proper typographic hierarchy.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "slide-count",
+          "text": "Presentation has approximately 8 slides (6-10 acceptable)"
+        },
+        {
+          "id": "brand-color-lime",
+          "text": "Uses FRG lime green (#93C30B or close variant) somewhere in the presentation"
+        },
+        {
+          "id": "multiple-vor-products",
+          "text": "Mentions at least 3 VOR products by name"
+        },
+        {
+          "id": "approved-tagline",
+          "text": "Includes at least one approved FRG tagline: 'Analyze Risk Differently' or 'Build. Run. Illuminate.'"
+        },
+        {
+          "id": "content-coverage",
+          "text": "Covers all three areas: company overview/mission, product portfolio, and differentiation/why FRG"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Draft a one-page sales leave-behind document (Word doc) for VOR Performance specifically targeting risk analysts. Something they can take away after a demo meeting that summarizes the key benefits and features.",
+      "expected_output": "A .docx file styled with FRG branding (black/white/lime for VOR materials, no magenta), content tailored to End User persona (analysts), and focused on VOR Performance features.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "vor-colors-no-magenta",
+          "text": "Uses VOR-appropriate colors (black/white/lime/green) and does NOT use magenta/maroon accents"
+        },
+        {
+          "id": "vor-performance-focus",
+          "text": "Content is specifically about VOR Performance (not generic VOR or VOR Stream)"
+        },
+        {
+          "id": "analyst-targeting",
+          "text": "Content speaks to analysts/end users — mentions ease of use, insights, visualization, speed, or analytics"
+        },
+        {
+          "id": "performance-analytics",
+          "text": "Mentions performance analytics, production reports, or performance attribution"
+        },
+        {
+          "id": "frg-branding",
+          "text": "Includes FRG company identification (company name, website frgrisk.com, or logo reference)"
+        }
+      ]
+    }
+  ]
+}

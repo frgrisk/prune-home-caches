@@ -1,0 +1,112 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  claude-review:
+    name: Claude code review
+    runs-on: [self-hosted, permanent]
+    # A review takes minutes. Without this the job inherits GitHub's 6 hour
+    # default, so an agent that stalls waiting on something holds a permanent
+    # runner for the rest of the day.
+    timeout-minutes: 30
+    if: |
+      !contains(github.event.pull_request.title, '[skip-review]') &&
+      !contains(github.event.pull_request.title, '[WIP]') &&
+      github.event.pull_request.user.login != 'claude[bot]' &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      github.event.pull_request.user.login != 'github-actions[bot]'
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+      id-token: write
+      # Lets the action install its github_ci MCP server, which reads this PR's
+      # check results and job logs. The action allowlists those tools itself.
+      actions: read
+
+    steps:
+      - name: Clean Claude state
+        run: rm -rf ~/.claude
+
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # The action installs its MCP servers at run time and needs Node for them.
+      - name: Use Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Run Claude Code Review
+        id: claude-review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Run review subagents synchronously. Since Claude Code 2.1.198
+          # subagents run in the background by default and never resume in a
+          # one-shot headless run, so the agent ends its turn waiting on them
+          # and the review is never posted
+          # (anthropics/claude-code-action#1462).
+          settings: |
+            {
+              "env": { "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1" }
+            }
+          # Full JSON transcript in the job log, to debug reviews that finish
+          # without posting
+          show_full_output: true
+          track_progress: ${{ vars.CLAUDE_TRACK_PROGRESS || 'true' }}
+          use_sticky_comment: ${{ vars.CLAUDE_USE_STICKY_COMMENT || 'true' }}
+          # The plugin `.claude/settings.json` already enables, and the
+          # marketplace it comes from, so a CI review and a local session run
+          # the same skill.
+          plugin_marketplaces: ${{ vars.CLAUDE_PLUGIN_MARKETPLACES || 'https://github.com/anthropics/claude-plugins-official.git' }}
+          plugins: ${{ vars.CLAUDE_PLUGINS || 'mattpocock-skills@claude-plugins-official' }}
+          # The review runs the same two-axis skill developers run locally, so
+          # CI and local reviews apply one standard. The skill only reports; the
+          # sticky comment from track_progress is what posts it.
+          prompt: |
+            ${{ vars.CLAUDE_REVIEW_PROMPT || '' }}
+            # CLAUDE_REVIEW_COMMAND, when set, is the whole command, used
+            # verbatim. It is not a format string.
+            ${{ vars.CLAUDE_REVIEW_COMMAND || format('/mattpocock-skills:code-review origin/{0}', github.event.pull_request.base.ref) }}
+
+            For the Spec axis, the spec is this pull request's own description,
+            read with `gh pr view ${{ github.event.pull_request.number }} --json title,body`.
+            If it doesn't state what was asked for, report the spec as
+            unavailable rather than inferring it from the diff.
+
+            The skill's rule about skipping what tooling already enforces
+            applies to the pre-commit check on this PR, this repo's only gate:
+            ruff, markdownlint, gitleaks, addlicense, the uv lock hook and the
+            file hygiene hooks. Don't re-run them and don't report what they
+            already catch. Review what they can't.
+
+            You can read that check's result and logs for this PR. Use that to
+            see what it already caught, so you can skip it. Its pass or fail
+            state is not a review finding, and the PR already shows it.
+
+            This review runs alongside that check and outlasts it, so it may
+            still be running when you look. Read its result at most once, never
+            wait for it to finish, and never re-poll it. Review the diff on what
+            you have.
+          # The reviewer investigates; it does not re-run the checks. A compound
+          # command is denied whole if any part of it is unlisted, so the
+          # pipeline tails (head, wc, sort, cut, echo, ...) have to be listed
+          # too: without them a permitted `grep` still dies on its `| head`.
+          # Deliberately absent: python3, because it is arbitrary code execution
+          # and jq covers the JSON parsing it gets reached for; and pre-commit,
+          # because it runs as its own check and the prompt says to skip it. Add
+          # an entry when a denied command costs the reviewer a fact it then
+          # reports as uncertainty.
+          claude_args: ${{ vars.CLAUDE_ARGS || format('--model {0} --allowedTools "Skill,Task,Agent,WebFetch,WebSearch,Bash(gh:*),Bash(git:*),Bash(jq:*),Bash(grep:*),Bash(rg:*),Bash(find:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(sort:*),Bash(uniq:*),Bash(cut:*),Bash(sed:*),Bash(echo:*)"', vars.CLAUDE_MODEL || 'claude-opus-5') }}
+          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
+          # or https://code.claude.com/docs/en/cli-reference for available options

@@ -1,0 +1,38 @@
+# Copyright 2026 The Financial Risk Group, Inc.
+
+# Dependabot version updates. See:
+# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
+#
+# Only ecosystems that this template actually ships are listed. Adding an
+# ecosystem with no manifest produces failing Dependabot jobs, so there is no
+# "uv" entry: pre-commit is installed into a local venv, not pinned by a
+# manifest. Add one if the repo grows a pyproject.toml.
+#
+# Note: agent skills under .agents/skills/ are NOT dependencies. They are
+# updated by .github/workflows/update-skills.yaml instead.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    # Wait 7 days after a release before opening a PR (lets bad releases get
+    # yanked and matches uv's exclude-newer guidance).
+    cooldown:
+      default-days: 7
+
+  # Bumps the `rev` pins in .pre-commit-config.yaml. Version updates only;
+  # Dependabot does not provide security updates for this ecosystem.
+  - package-ecosystem: "pre-commit"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    cooldown:
+      default-days: 7
+    groups:
+      all-hooks:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"

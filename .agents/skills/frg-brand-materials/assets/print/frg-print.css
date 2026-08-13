@@ -1,0 +1,203 @@
+/*
+ * FRG branded print stylesheet for markdown -> PDF rendering (WeasyPrint).
+ * Font and image url()s are relative to THIS file (assets/print/), so they
+ * reach up one level into assets/fonts/ and assets/logos/.
+ *
+ * Brand source of truth: ../../SKILL.md (frg-brand-materials).
+ *   Lime accent #93C30B  |  body black #000  |  secondary dark gray #4B4B4B
+ */
+
+/* ---- Fonts (bundled fallbacks for Chronicle/Akkurat) ---- */
+@font-face {
+  font-family: "FRG Serif";
+  src: url("../fonts/Libre_Baskerville/LibreBaskerville-Regular.ttf");
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: "FRG Serif";
+  src: url("../fonts/Libre_Baskerville/LibreBaskerville-Bold.ttf");
+  font-weight: bold;
+  font-style: normal;
+}
+@font-face {
+  font-family: "FRG Serif";
+  src: url("../fonts/Libre_Baskerville/LibreBaskerville-Italic.ttf");
+  font-weight: normal;
+  font-style: italic;
+}
+@font-face {
+  font-family: "FRG Sans";
+  src: url("../fonts/IBM_Plex_Sans/IBMPlexSans-Regular.ttf");
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: "FRG Sans";
+  src: url("../fonts/IBM_Plex_Sans/IBMPlexSans-Bold.ttf");
+  font-weight: bold;
+  font-style: normal;
+}
+@font-face {
+  font-family: "FRG Sans";
+  src: url("../fonts/IBM_Plex_Sans/IBMPlexSans-Italic.ttf");
+  font-weight: normal;
+  font-style: italic;
+}
+@font-face {
+  font-family: "FRG Sans Medium";
+  src: url("../fonts/IBM_Plex_Sans/IBMPlexSans-Medium.ttf");
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* ---- Page geometry, running header + footer ---- */
+@page {
+  size: letter;
+  margin: 1in 0.85in 0.95in 0.85in;
+
+  @top-right {
+    content: element(brandHeader);
+    vertical-align: middle;
+  }
+  @bottom-left {
+    content: "frgrisk.com";
+    font-family: "FRG Sans", Arial, sans-serif;
+    font-size: 8pt;
+    color: #4b4b4b;
+    vertical-align: middle;
+  }
+  @bottom-right {
+    content: "Page " counter(page) " of " counter(pages);
+    font-family: "FRG Sans", Arial, sans-serif;
+    font-size: 8pt;
+    color: #4b4b4b;
+    vertical-align: middle;
+  }
+}
+
+.brand-header {
+  position: running(brandHeader);
+}
+.brand-header img {
+  height: 20px;
+  width: auto;
+}
+
+/* ---- Body typography ---- */
+html {
+  font-family: "FRG Sans", Arial, sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.45;
+  color: #000000;
+}
+body {
+  margin: 0;
+}
+
+p {
+  margin: 0 0 0.6em 0;
+}
+
+/* ---- Headings: serif, lime accents ---- */
+h1,
+h2,
+h3,
+h4 {
+  font-family: "FRG Serif", Georgia, serif;
+  color: #000000;
+  line-height: 1.2;
+  margin: 0.9em 0 0.4em 0;
+}
+h1 {
+  font-size: 21pt;
+  margin-top: 0;
+  padding-bottom: 0.18em;
+  border-bottom: 3px solid #93c30b; /* lime rule under the title */
+}
+h2 {
+  font-size: 15pt;
+  padding-left: 0.4em;
+  border-left: 4px solid #93c30b; /* lime section accent */
+}
+h3 {
+  font-size: 12.5pt;
+}
+h4 {
+  font-size: 11pt;
+  color: #4b4b4b;
+}
+
+a {
+  color: #244a66;
+  text-decoration: none;
+}
+
+strong {
+  font-weight: bold;
+}
+
+/* ---- Tables ---- */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.6em 0 1em 0;
+  font-size: 9.5pt;
+}
+th {
+  background: #000000;
+  color: #ffffff;
+  font-family: "FRG Sans Medium", "FRG Sans", Arial, sans-serif;
+  text-align: left;
+  padding: 5px 8px;
+}
+td {
+  border-bottom: 1px solid #dbeae5;
+  padding: 5px 8px;
+  vertical-align: top;
+}
+tr:nth-child(even) td {
+  background: #f5f5f5;
+}
+
+/* ---- Code / formulas ---- */
+code {
+  font-family: "Courier New", monospace;
+  font-size: 9.5pt;
+  background: #f5f5f5;
+  padding: 1px 3px;
+  border-radius: 2px;
+}
+pre {
+  background: #f5f5f5;
+  border-left: 3px solid #a6a6a6;
+  padding: 8px 10px;
+  margin: 0.6em 0 1em 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+pre code {
+  background: none;
+  padding: 0;
+}
+
+/* ---- Misc ---- */
+ul,
+ol {
+  margin: 0 0 0.7em 0;
+  padding-left: 1.4em;
+}
+li {
+  margin: 0.15em 0;
+}
+blockquote {
+  margin: 0.6em 0;
+  padding: 0.2em 0 0.2em 0.9em;
+  border-left: 3px solid #93c30b;
+  color: #4b4b4b;
+}
+hr {
+  border: none;
+  border-top: 1px solid #a6a6a6;
+  margin: 1.2em 0;
+}
