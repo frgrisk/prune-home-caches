@@ -34,7 +34,7 @@ Ships as a noarch RPM that installs a systemd timer running weekly with `Persist
 [`README.md`](README.md) for the operator runbook.
 
 The script needs only bash ≥ 4.2, GNU coreutils, GNU findutils (`find -printf`) and `ps`, and assumes homes live
-under `/home`. The RPM targets EL9, which is the only place it has actually run — don't widen that claim in the
+under `/home`. The RPM targets EL9, which is the only place it has actually run. Don't widen that claim in the
 docs without testing elsewhere.
 
 ### Layout
@@ -57,7 +57,7 @@ sudo ./src/test-prune-home-caches.sh ./src/prune-home-caches.sh   # expect: 25 p
 ```
 
 Also check `bash -n` on both scripts, `shellcheck`, and `systemd-analyze verify` on the units. The last one is
-not optional — see the traps below.
+not optional; see the traps below.
 
 ### Traps
 
@@ -86,7 +86,7 @@ this; verify by extracting the built RPM.
 ### Shell conventions
 
 The script follows the `bash-defensive-patterns` skill: `set -Eeuo pipefail`, an ERR trap, `[[ ]]`, `local -r`,
-levelled logging, `command -v` dependency checks, validated inputs, `printf` over `echo`, and no `ls` parsing.
+leveled logging, `command -v` dependency checks, validated inputs, `printf` over `echo`, and no `ls` parsing.
 It was audited against that standard, and a follow-up audit fixed three gaps (undeclared dependencies, an
 unvalidated `--user` permitting path traversal, swallowed stderr). Hold new contributions to the same bar.
 
