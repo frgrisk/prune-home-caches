@@ -11,10 +11,9 @@ concurrency:
 jobs:
   claude-review:
     name: Claude code review
-    runs-on: [self-hosted, permanent]
-    # A review takes minutes. Without this the job inherits GitHub's 6 hour
-    # default, so an agent that stalls waiting on something holds a permanent
-    # runner for the rest of the day.
+    # Hosted: fork PRs must not run on a persistent runner.
+    runs-on: ubuntu-latest
+    # Without this a stalled agent burns GitHub's 6 hour default.
     timeout-minutes: 30
     if: |
       !contains(github.event.pull_request.title, '[skip-review]') &&
@@ -32,9 +31,6 @@ jobs:
       actions: read
 
     steps:
-      - name: Clean Claude state
-        run: rm -rf ~/.claude
-
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
@@ -79,16 +75,24 @@ jobs:
             # verbatim. It is not a format string.
             ${{ vars.CLAUDE_REVIEW_COMMAND || format('/mattpocock-skills:code-review origin/{0}', github.event.pull_request.base.ref) }}
 
-            For the Spec axis, the spec is this pull request's own description,
-            read with `gh pr view ${{ github.event.pull_request.number }} --json title,body`.
-            If it doesn't state what was asked for, report the spec as
-            unavailable rather than inferring it from the diff.
+            For the Spec axis, the spec is the GitHub issue this pull request
+            closes. Find it with
+            `gh pr view ${{ github.event.pull_request.number }} --json title,body,closingIssuesReferences`,
+            then read each referenced issue with `gh issue view <number> --comments`.
+            When the PR closes no issue, fall back to its own description. If
+            neither states what was asked for, report the spec as unavailable
+            rather than inferring it from the diff.
 
             The skill's rule about skipping what tooling already enforces
             applies to the pre-commit check on this PR, this repo's only gate:
-            ruff, markdownlint, gitleaks, addlicense, the uv lock hook and the
-            file hygiene hooks. Don't re-run them and don't report what they
-            already catch. Review what they can't.
+            markdownlint, gitleaks, addlicense, shellcheck, ruff, the uv lock
+            hook and the file hygiene hooks. Don't re-run them and don't report
+            what they already catch. Review what they can't.
+
+            One exception. shellcheck is gated at `--severity=warning`, so
+            note and info level shell findings are yours to report, not the
+            hook's. `.pre-commit-config.yaml` records the five notes that are
+            accepted standing; a new one in changed code is worth raising.
 
             You can read that check's result and logs for this PR. Use that to
             see what it already caught, so you can skip it. Its pass or fail
@@ -107,6 +111,6 @@ jobs:
           # because it runs as its own check and the prompt says to skip it. Add
           # an entry when a denied command costs the reviewer a fact it then
           # reports as uncertainty.
-          claude_args: ${{ vars.CLAUDE_ARGS || format('--model {0} --allowedTools "Skill,Task,Agent,WebFetch,WebSearch,Bash(gh:*),Bash(git:*),Bash(jq:*),Bash(grep:*),Bash(rg:*),Bash(find:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(sort:*),Bash(uniq:*),Bash(cut:*),Bash(sed:*),Bash(echo:*)"', vars.CLAUDE_MODEL || 'claude-opus-5') }}
+          claude_args: ${{ vars.CLAUDE_ARGS || format('--model {0} --allowedTools "Skill,Task,Agent,WebFetch,WebSearch,Bash(gh:*),Bash(git:*),Bash(jq:*),Bash(grep:*),Bash(rg:*),Bash(find:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(sort:*),Bash(uniq:*),Bash(cut:*),Bash(sed:*),Bash(echo:*),Bash(shellcheck:*),Bash(rpmspec:*)"', vars.CLAUDE_MODEL || 'claude-opus-5') }}
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options

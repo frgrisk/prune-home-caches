@@ -1,8 +1,7 @@
 # Copyright 2026 The Financial Risk Group, Inc.
 
-# Claude Code: ignore local/user-specific files only.
-# The vendored skill trees (.agents/skills/, .claude/skills/) and the shared
-# .claude/settings.json are deliberately committed. Do not ignore them.
+# Claude Code: ignore local/user-specific files only. The shared
+# .claude/settings.json is deliberately committed. Do not ignore it.
 .claude/*.local.*
 .claude/todos/
 .claude/worktrees/
@@ -26,6 +25,10 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+
+# rpmbuild's _topdir points at ./rpmbuild, so local builds land in the checkout.
+rpmbuild/
+*.rpm
 
 # Node
 node_modules/

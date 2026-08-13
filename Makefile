@@ -12,7 +12,7 @@ help: Makefile
 VENV := .venv
 PRE_COMMIT := $(VENV)/bin/pre-commit
 
-.PHONY: help pre-commit-install pre-commit update-skills
+.PHONY: help pre-commit-install pre-commit
 all: help
 
 # A repo-local venv holding pre-commit, created on demand and gitignored. No
@@ -32,7 +32,7 @@ all: help
 # switch this target to `uv sync --only-group dev`.
 $(PRE_COMMIT):
 	@command -v uv >/dev/null || { \
-	  echo "ERROR: uv is not installed. Python tooling in FRG repos runs through uv."; \
+	  echo "ERROR: uv is not installed. Python tooling here runs through uv."; \
 	  echo ""; \
 	  echo "  curl -LsSf https://astral.sh/uv/install.sh | sh"; \
 	  echo ""; \
@@ -47,7 +47,3 @@ pre-commit-install: $(PRE_COMMIT)
 ## pre-commit: Runs all pre-commit hooks against every file
 pre-commit: $(PRE_COMMIT)
 	$(PRE_COMMIT) run --all-files
-
-## update-skills: Refreshes the vendored agent skills from upstream
-update-skills:
-	./update-skills.sh

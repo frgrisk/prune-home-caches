@@ -1,0 +1,156 @@
+# Copyright 2026 The Financial Risk Group, Inc.
+
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  # Builds and verifies without publishing.
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and verify RPM (el${{ matrix.el }})
+    runs-on: ubuntu-latest
+    strategy:
+      # Each package is independently useful; one broken EL must not withhold the rest.
+      fail-fast: false
+      matrix:
+        el: [8, 9, 10]
+    # noarch, but the dist tag is not: one build per EL or `rpm -q` reports the
+    # wrong release. AlmaLinux 10 needs x86-64-v3; a glibc CPU error here is the
+    # runner, not the package.
+    container: almalinux:${{ matrix.el }}
+    permissions:
+      contents: read
+    steps:
+      # Must precede checkout: without git it falls back to a REST tarball and
+      # `git archive` has no repository. sudo is for the harness, which re-invokes
+      # through `sudo -E`. No coreutils: the image ships conflicting
+      # coreutils-single.
+      - name: Install build and test dependencies
+        run: |
+          dnf -y install --setopt=install_weak_deps=False \
+            git rpm-build sudo procps-ng \
+            tar gzip systemd findutils gawk
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Trust the workspace
+        # Root in the container over a runner-owned checkout; git refuses without this.
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Resolve version
+        id: version
+        run: |
+          spec_version="$(awk '/^Version:/ {print $2; exit}' rpm/prune-home-caches.spec)"
+          echo "spec=$spec_version" >>"$GITHUB_OUTPUT"
+
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            tag_version="${GITHUB_REF_NAME#v}"
+            if [[ "$tag_version" != "$spec_version" ]]; then
+              echo "::error title=Tag does not match spec::Tag $GITHUB_REF_NAME implies version $tag_version, but rpm/prune-home-caches.spec declares $spec_version. Bump Version and add a %changelog entry, or retag."
+              exit 1
+            fi
+          fi
+
+      - name: Run test harness
+        # Fixture under mktemp -d via HOME_MOUNT; never touches the real /home.
+        run: ./src/test-prune-home-caches.sh ./src/prune-home-caches.sh
+
+      - name: Build RPM
+        env:
+          VERSION: ${{ steps.version.outputs.spec }}
+        run: |
+          mkdir -p rpmbuild/SOURCES
+          # Prefix must be %{name}-%{version} or %setup cannot find the tree.
+          git archive --format=tar.gz \
+            --prefix="prune-home-caches-${VERSION}/" \
+            -o "rpmbuild/SOURCES/prune-home-caches-${VERSION}.tar.gz" HEAD
+          rpmbuild --define "_topdir $PWD/rpmbuild" -bb rpm/prune-home-caches.spec
+
+          rpm_path="$(find rpmbuild/RPMS -name '*.noarch.rpm' -print -quit)"
+          if [[ -z "$rpm_path" ]]; then
+            echo "::error title=No RPM produced::rpmbuild reported success but rpmbuild/RPMS holds no noarch package."
+            exit 1
+          fi
+          echo "RPM_PATH=$rpm_path" >>"$GITHUB_ENV"
+
+      - name: Install the built RPM
+        # The checks below need the package on disk. %post guards its systemctl
+        # calls with `|| :`, so no PID 1 is fine.
+        run: dnf -y install "$RPM_PATH"
+
+      - name: Verify packaged units
+        # Only check that fails on an invalid directive value, which systemd
+        # otherwise ignores with a warning. Must run post-install: ExecStart is an
+        # absolute path, so verifying the checkout always fails.
+        run: |
+          systemd-analyze verify \
+            /usr/lib/systemd/system/prune-home-caches.service \
+            /usr/lib/systemd/system/prune-home-caches.timer
+
+      - name: Verify ExecStart resolves to a packaged path
+        # rpmbuild does not cross-check the units against %files.
+        run: |
+          exec_start="$(awk -F= '/^ExecStart=/ {split($2, a, " "); print a[1]; exit}' \
+            /usr/lib/systemd/system/prune-home-caches.service)"
+
+          if ! rpm -ql prune-home-caches | grep -Fxq "$exec_start"; then
+            echo "::error title=ExecStart is not packaged::The service starts $exec_start, which is absent from the package's file list. Align ExecStart with the %install destination in the spec."
+            rpm -ql prune-home-caches
+            exit 1
+          fi
+
+          echo "ExecStart=$exec_start is packaged and executable"
+
+      - name: Summarize package contents
+        run: |
+          {
+            echo "### $(basename "$RPM_PATH")"
+            echo
+            rpm -qi prune-home-caches | grep -E '^(Version|Release|License|URL)'
+            echo
+            echo '```text'
+            rpm -ql prune-home-caches
+            echo '```'
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: rpm-el${{ matrix.el }}
+          path: rpmbuild/RPMS/noarch/*.rpm
+          if-no-files-found: error
+
+  publish:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: rpm-el*
+          merge-multiple: true
+          path: dist
+
+      - name: List packages to publish
+        run: ls -1 dist/*.rpm
+
+      # gh is preinstalled: no third-party action needed.
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.rpm \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes

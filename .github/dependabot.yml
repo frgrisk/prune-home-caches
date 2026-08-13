@@ -7,9 +7,6 @@
 # ecosystem with no manifest produces failing Dependabot jobs, so there is no
 # "uv" entry: pre-commit is installed into a local venv, not pinned by a
 # manifest. Add one if the repo grows a pyproject.toml.
-#
-# Note: agent skills under .agents/skills/ are NOT dependencies. They are
-# updated by .github/workflows/update-skills.yaml instead.
 version: 2
 updates:
   - package-ecosystem: "github-actions"
