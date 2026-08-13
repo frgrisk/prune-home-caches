@@ -11,9 +11,12 @@ run took that mount to 56%, freeing 39G.
 The script itself needs only bash ≥ 4.2, GNU coreutils, GNU findutils (it uses `find -printf`), and `ps`. It
 assumes user home directories live under `/home`.
 
-Packaging and scheduling are the distro-specific parts: the spec builds a noarch RPM for EL9, which is where
-this has actually been run. On anything else with systemd, install `src/prune-home-caches.sh` and the two units
-by hand. Nothing in them is RHEL-specific.
+Packaging is a noarch RPM, and the spec builds on EL8, EL9 and EL10, each taking its own dist tag. Releases
+publish the el9 build, which installs cleanly on all three: verified on AlmaLinux 8.10, 9.8 and 10.2, where the
+units verify and all 25 assertions pass. Production use is EL9.
+
+On a systemd distro outside that family, install `src/prune-home-caches.sh` and the two units by hand. Nothing
+in them is RHEL-specific.
 
 ---
 

@@ -35,8 +35,11 @@ Ships as a noarch RPM that installs a systemd timer running weekly with `Persist
 [`README.md`](README.md) for the operator runbook.
 
 The script needs only bash ≥ 4.2, GNU coreutils, GNU findutils (`find -printf`) and `ps`, and assumes homes live
-under `/home`. The RPM targets EL9, which is the only place it has actually run. Don't widen that claim in the
-docs without testing elsewhere.
+under `/home`.
+
+The spec builds natively on EL8, EL9 and EL10, each picking up its own dist tag, and the el9 package installs
+and passes on all three. Verified on AlmaLinux 8.10, 9.8 and 10.2: units verify, 25 assertions pass. Production
+use is EL9, and releases publish the el9 build. Don't widen the claim past EL10 without testing there.
 
 ### Layout
 
