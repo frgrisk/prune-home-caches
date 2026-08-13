@@ -11,7 +11,8 @@ on:
 jobs:
   pre-commit:
     name: Pre-commit checks
-    runs-on: [self-hosted, permanent]
+    # Hosted: fork PRs must not run on a persistent runner.
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:

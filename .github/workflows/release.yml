@@ -5,8 +5,7 @@ name: release
 on:
   push:
     tags: ["v*"]
-  # Builds and verifies without publishing, so the packaging can be exercised
-  # without spending a version number on it.
+  # Builds and verifies without publishing.
   workflow_dispatch:
 
 concurrency:
@@ -18,31 +17,21 @@ jobs:
     name: Build and verify RPM (el${{ matrix.el }})
     runs-on: ubuntu-latest
     strategy:
-      # Each release is independently useful, so one broken EL should not
-      # withhold the other two from the release.
+      # Each package is independently useful; one broken EL must not withhold the rest.
       fail-fast: false
       matrix:
         el: [8, 9, 10]
-    # The package is noarch, but the dist tag it carries is not: a package built
-    # on EL9 installs on 8 and 10 while claiming .el9, which misleads anyone
-    # reading `rpm -q` on those hosts. One build per release keeps the tag
-    # honest, and builds each where it will be installed.
-    #
-    # AlmaLinux 10 requires x86-64-v3. Every current GitHub-hosted runner CPU
-    # provides it; a "Fatal glibc error: CPU does not support x86-64-v3" here
-    # means the leg landed on something older, not a packaging fault.
+    # noarch, but the dist tag is not: one build per EL or `rpm -q` reports the
+    # wrong release. AlmaLinux 10 needs x86-64-v3; a glibc CPU error here is the
+    # runner, not the package.
     container: almalinux:${{ matrix.el }}
     permissions:
       contents: read
     steps:
-      # Before checkout: the base image has no git, so actions/checkout would
-      # fall back to a REST tarball and `git archive` would have no repository
-      # to read. sudo is here for the test harness, which re-invokes the script
-      # through `sudo -E` even when already root.
-      #
-      # coreutils is deliberately absent despite the script depending on it. The
-      # base image ships coreutils-single, which provides the same binaries and
-      # conflicts with coreutils, so naming it here fails the install outright.
+      # Must precede checkout: without git it falls back to a REST tarball and
+      # `git archive` has no repository. sudo is for the harness, which re-invokes
+      # through `sudo -E`. No coreutils: the image ships conflicting
+      # coreutils-single.
       - name: Install build and test dependencies
         run: |
           dnf -y install --setopt=install_weak_deps=False \
@@ -54,8 +43,7 @@ jobs:
           fetch-depth: 0
 
       - name: Trust the workspace
-        # The container runs as root while the checkout is owned by the runner
-        # user, which git reads as dubious ownership and refuses to act on.
+        # Root in the container over a runner-owned checkout; git refuses without this.
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Resolve version
@@ -73,9 +61,7 @@ jobs:
           fi
 
       - name: Run test harness
-        # Builds a fixture under mktemp -d and drives the real script at it
-        # through the HOME_MOUNT override, so it never touches the container's
-        # /home. Expect 25 assertions.
+        # Fixture under mktemp -d via HOME_MOUNT; never touches the real /home.
         run: ./src/test-prune-home-caches.sh ./src/prune-home-caches.sh
 
       - name: Build RPM
@@ -83,8 +69,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.spec }}
         run: |
           mkdir -p rpmbuild/SOURCES
-          # The prefix has to be %{name}-%{version} or %setup cannot find the
-          # tree it just unpacked.
+          # Prefix must be %{name}-%{version} or %setup cannot find the tree.
           git archive --format=tar.gz \
             --prefix="prune-home-caches-${VERSION}/" \
             -o "rpmbuild/SOURCES/prune-home-caches-${VERSION}.tar.gz" HEAD
@@ -98,31 +83,21 @@ jobs:
           echo "RPM_PATH=$rpm_path" >>"$GITHUB_ENV"
 
       - name: Install the built RPM
-        # Installing here is what makes the two checks below meaningful, and it
-        # exercises %post at the same time. Its systemctl calls are all guarded
-        # with `|| :`, so no PID 1 in the container is fine.
+        # The checks below need the package on disk. %post guards its systemctl
+        # calls with `|| :`, so no PID 1 is fine.
         run: dnf -y install "$RPM_PATH"
 
       - name: Verify packaged units
-        # Required, not belt-and-braces. An invalid value for a unit directive is
-        # ignored with only a warning at load time, so ProtectHome=read-write
-        # once silently disabled the sandbox, and this is the only check that
-        # fails on it.
-        #
-        # Runs after the install rather than against systemd/ in the checkout,
-        # because ExecStart names an absolute path. Verified before the package
-        # is laid down, every run fails with "Command /usr/sbin/... is not
-        # executable" whether or not the units are actually sound.
+        # Only check that fails on an invalid directive value, which systemd
+        # otherwise ignores with a warning. Must run post-install: ExecStart is an
+        # absolute path, so verifying the checkout always fails.
         run: |
           systemd-analyze verify \
             /usr/lib/systemd/system/prune-home-caches.service \
             /usr/lib/systemd/system/prune-home-caches.timer
 
       - name: Verify ExecStart resolves to a packaged path
-        # Nothing in rpmbuild cross-checks the units against %files, and the
-        # first build of this package shipped ExecStart=/usr/local/sbin/... for a
-        # script installed to /usr/sbin, which would have failed on every host at
-        # first run.
+        # rpmbuild does not cross-check the units against %files.
         run: |
           exec_start="$(awk -F= '/^ExecStart=/ {split($2, a, " "); print a[1]; exit}' \
             /usr/lib/systemd/system/prune-home-caches.service)"
@@ -170,8 +145,7 @@ jobs:
       - name: List packages to publish
         run: ls -1 dist/*.rpm
 
-      # gh is preinstalled on the runner image, so publishing needs no
-      # third-party action and no container.
+      # gh is preinstalled: no third-party action needed.
       - name: Create release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

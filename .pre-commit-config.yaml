@@ -5,12 +5,8 @@ repos:
       # Run the linter.
       - id: ruff-check
         args: [--fix]
-        # Vendored skills carry their own upstream lint settings. Linting them
-        # with ours rewrites code we don't own, and update-skills reverts it.
-        exclude: "\\.agents/skills/|\\.claude/skills/"
       # Run the formatter.
       - id: ruff-format
-        exclude: "\\.agents/skills/|\\.claude/skills/"
 
   - repo: https://github.com/google/addlicense
     rev: "v1.2.0"
@@ -26,12 +22,6 @@ repos:
             "copyright.gotmpl",
             "-ignore",
             ".github/workflows/claude*.yml",
-            # Vendored upstream skills aren't ours to claim copyright on, and a
-            # header here is overwritten by the next update-skills run anyway.
-            "-ignore",
-            ".agents/skills/**",
-            "-ignore",
-            ".claude/skills/**",
           ]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -39,45 +29,33 @@ repos:
     hooks:
       - id: detect-private-key
       - id: check-added-large-files
-        # frg-brand-materials ships fonts, photos, and Office templates, 18 of
-        # which are over the 500 KB default. Keep the guard for project files.
-        exclude: "\\.agents/skills/|\\.claude/skills/"
       - id: check-json
       - id: check-merge-conflict
       - id: check-toml
       - id: check-yaml
         args: [--unsafe]
       - id: end-of-file-fixer
-        exclude: "testdata/|.idea/|\\.claude/skills/|\\.claude/worktrees/|\\.agents/skills/"
+        exclude: "testdata/|.idea/|\\.claude/worktrees/"
       - id: mixed-line-ending
         args: [--fix=lf]
       - id: trailing-whitespace
-        exclude: "testdata/|.idea/|\\.claude/skills/|\\.claude/worktrees/|\\.agents/skills/"
+        exclude: "testdata/|.idea/|\\.claude/worktrees/"
 
-  # shellcheck-py ships a prebuilt binary through pip, so this needs no Docker
-  # daemon the way koalaman/shellcheck-precommit does.
-  #
-  # Gated at `warning`, which the tree is clean against. Below that threshold
-  # sit five accepted notes: SC2009 on the `ps | grep` in collect_inuse_paths,
-  # which is how that function extracts matched paths and so cannot become
-  # pgrep, and four SC2015 `A && B || C` notes in the test harness, where it is
-  # the intended control flow. Dropping to `--severity=info` means suppressing
-  # those five individually first.
+  # shellcheck-py over koalaman/shellcheck-precommit: no Docker daemon needed.
+  # Gated at `warning`; the tree is clean there. Five notes below it are accepted
+  # (SC2009 on the `ps | grep`, SC2015 in the harness), so `info` would fail.
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.11.0.1
     hooks:
       - id: shellcheck
         args: ["--severity=warning"]
 
-  # The hook keeps its default `types: [markdown]` matching rather than a
-  # `files: ^docs/` scope, so root-level README.md and AGENTS.md are linted
-  # alongside docs/agents/.
-  # Vendored skills are upstream markdown that would never satisfy our rules.
+  # Default `types: [markdown]` rather than a `files: ^docs/` scope, so root-level
+  # README.md and AGENTS.md are linted too.
   - repo: https://github.com/DavidAnson/markdownlint-cli2
     rev: "v0.23.1"
     hooks:
       - id: markdownlint-cli2
-        exclude: "\\.agents/skills/|\\.claude/skills/"
         args: ["--config", ".markdownlint.json"]
 
   - repo: https://github.com/gitleaks/gitleaks

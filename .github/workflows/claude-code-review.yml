@@ -11,10 +11,9 @@ concurrency:
 jobs:
   claude-review:
     name: Claude code review
-    runs-on: [self-hosted, permanent]
-    # A review takes minutes. Without this the job inherits GitHub's 6 hour
-    # default, so an agent that stalls waiting on something holds a permanent
-    # runner for the rest of the day.
+    # Hosted: fork PRs must not run on a persistent runner.
+    runs-on: ubuntu-latest
+    # Without this a stalled agent burns GitHub's 6 hour default.
     timeout-minutes: 30
     if: |
       !contains(github.event.pull_request.title, '[skip-review]') &&
@@ -32,9 +31,6 @@ jobs:
       actions: read
 
     steps:
-      - name: Clean Claude state
-        run: rm -rf ~/.claude
-
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
