@@ -1,0 +1,37 @@
+# Copyright 2026 The Financial Risk Group, Inc.
+
+name: pre-commit
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pre-commit:
+    name: Pre-commit checks
+    runs-on: [self-hosted, permanent]
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      # uvx runs pre-commit from an ephemeral environment, so this repo needs no
+      # Python manifest. Safe here in a way it isn't locally: CI installs no git
+      # hook, so nothing records a path into uv's prunable cache. Hook versions
+      # are pinned by `rev` in .pre-commit-config.yaml and bumped by Dependabot.
+      # If this repo grows real Python code, put pre-commit in a `dev` dependency
+      # group and switch to `uv sync --only-group dev` + `uv run --no-sync`.
+      - name: Run pre-commit
+        run: uvx pre-commit run --all-files --show-diff-on-failure --color always
+      - name: Hint on failure
+        if: failure()
+        run: |
+          echo "::error title=pre-commit failed::Reproduce locally with the commands below, then re-commit and push."
+          echo ""
+          echo "  make pre-commit-install   # one-time: installs the git hook so this runs on every commit"
+          echo "  make pre-commit           # runs every hook against every file (auto-fixes where possible)"
+          echo ""
+          echo "Most hooks (end-of-file-fixer, trailing-whitespace, addlicense, mixed-line-ending) auto-fix."
+          echo "gitleaks and check-added-large-files report problems for you to address manually."

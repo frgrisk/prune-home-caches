@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "frg-brand-materials": {
+      "source": "frgrisk/skills",
+      "sourceType": "github",
+      "skillPath": "misc/frg-brand-materials/SKILL.md",
+      "computedHash": "0884c0c9640e2459bd45407c35f13d308a426e9f55393474d6a7655e6cd3fcd4"
+    }
+  }
+}

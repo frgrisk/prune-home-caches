@@ -1,0 +1,78 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.0
+    hooks:
+      # Run the linter.
+      - id: ruff-check
+        args: [--fix]
+        # Vendored skills carry their own upstream lint settings. Linting them
+        # with ours rewrites code we don't own, and update-skills reverts it.
+        exclude: "\\.agents/skills/|\\.claude/skills/"
+      # Run the formatter.
+      - id: ruff-format
+        exclude: "\\.agents/skills/|\\.claude/skills/"
+
+  - repo: https://github.com/google/addlicense
+    rev: "v1.2.0"
+    hooks:
+      - id: addlicense
+        args:
+          [
+            "-c",
+            "The Financial Risk Group, Inc.",
+            "-y",
+            "2026",
+            "-f",
+            "copyright.gotmpl",
+            "-ignore",
+            ".github/workflows/claude*.yml",
+            # Vendored upstream skills aren't ours to claim copyright on, and a
+            # header here is overwritten by the next update-skills run anyway.
+            "-ignore",
+            ".agents/skills/**",
+            "-ignore",
+            ".claude/skills/**",
+          ]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: detect-private-key
+      - id: check-added-large-files
+        # frg-brand-materials ships fonts, photos, and Office templates, 18 of
+        # which are over the 500 KB default. Keep the guard for project files.
+        exclude: "\\.agents/skills/|\\.claude/skills/"
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+        args: [--unsafe]
+      - id: end-of-file-fixer
+        exclude: "testdata/|.idea/|\\.claude/skills/|\\.claude/worktrees/|\\.agents/skills/"
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: trailing-whitespace
+        exclude: "testdata/|.idea/|\\.claude/skills/|\\.claude/worktrees/|\\.agents/skills/"
+
+  # Unlike FRG's docs sites, this repo has no docs/ directory, so the hook keeps
+  # its default `types: [markdown]` matching instead of a `files: ^docs/` scope.
+  # Vendored skills are upstream markdown that would never satisfy our rules.
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: "v0.23.1"
+    hooks:
+      - id: markdownlint-cli2
+        exclude: "\\.agents/skills/|\\.claude/skills/"
+        args: ["--config", ".markdownlint.json"]
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  # Python dependencies are managed with uv, never pip or Poetry. This hook only
+  # matches uv.lock / pyproject.toml / uv.toml, so it stays inert until the repo
+  # actually grows a Python project.
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: "0.11.32"
+    hooks:
+      - id: uv-lock

@@ -1,0 +1,36 @@
+# Copyright 2026 The Financial Risk Group, Inc.
+
+# Normalize line endings on the way in; git leaves detected binaries alone.
+* text=auto eol=lf
+
+# Vendored agent skills: upstream content, updated by CI, not our code. Keeps
+# them out of GitHub's language statistics. Deliberately not linguist-generated:
+# that would also collapse them in diffs, and reviewing what changed is the whole
+# point of the weekly update PR.
+.agents/skills/** linguist-vendored
+.claude/skills/** linguist-vendored
+
+# FRG's own scaffolding. These are real files we maintain, so they aren't
+# "vendored", but they shouldn't define a new repo's language either. Without
+# this, a freshly generated repo reports as 100% Go Template off 55 bytes of
+# copyright.gotmpl, then as mostly Shell once update-skills.sh is counted.
+# Markdown, YAML, and JSON need no rule: linguist counts only programming and
+# markup types, so prose and data files are already excluded.
+copyright.gotmpl -linguist-detectable
+update-skills.sh -linguist-detectable
+
+# Binary assets shipped by frg-brand-materials. Marked explicitly so no
+# platform's line-ending conversion can corrupt them.
+*.pptx binary
+*.docx binary
+*.xlsx binary
+*.pdf  binary
+*.ttf  binary
+*.otf  binary
+*.woff binary
+*.woff2 binary
+*.jpg  binary
+*.jpeg binary
+*.png  binary
+*.gif  binary
+*.ico  binary
