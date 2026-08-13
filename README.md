@@ -11,9 +11,8 @@ first full run took it to 56%.
 The script itself needs only bash ≥ 4.2, GNU coreutils, GNU findutils (it uses `find -printf`), and `ps`. It
 assumes user home directories live under `/home`.
 
-Packaging is a noarch RPM, and the spec builds on EL8, EL9 and EL10, each taking its own dist tag. Releases
-publish the el9 build, which installs cleanly on all three, with the units verifying and all 25 assertions
-passing.
+Packaging is a noarch RPM. Each release ships one package per EL major, built on that release so its dist tag
+matches the host it lands on. All three install, verify their units, and pass all 25 assertions.
 
 On a systemd distro outside that family, install `src/prune-home-caches.sh` and the two units by hand. Nothing
 in them is RHEL-specific.
@@ -88,15 +87,17 @@ Opt out per stage with `--no-cache` / `--no-modcache`.
 
 ## Deploying to a host
 
-Install enables the timer automatically. Take the package straight from a release:
+Install enables the timer automatically. Pick the asset matching the host's EL major:
 
 ```bash
-sudo dnf install https://github.com/frgrisk/prune-home-caches/releases/download/v1.0.0/prune-home-caches-1.0.0-1.el9.noarch.rpm
+el="$(rpm --eval '%{?rhel}')"
+sudo dnf install "https://github.com/frgrisk/prune-home-caches/releases/download/v1.0.0/prune-home-caches-1.0.0-1.el${el}.noarch.rpm"
+
 sudo dnf remove prune-home-caches      # disables the timer cleanly
 ```
 
 The asset name carries the version, so the URL pins a tag rather than tracking `latest`. `gh release download
-v1.0.0 --repo frgrisk/prune-home-caches` fetches it without hand-writing the path.
+v1.0.0 --repo frgrisk/prune-home-caches` fetches every package in one go instead.
 
 After installing, confirm `systemctl list-timers` shows a non-empty `NEXT`. Empty means it will never fire.
 
@@ -114,10 +115,11 @@ The prefix must match `%{name}-%{version}`, or `%setup` won't find the tree.
 
 ### Cutting a release
 
-Pushing a `v*` tag builds the RPM in an `almalinux:9` container, installs it, verifies the units and the
-packaged `ExecStart` path, then attaches the package to a GitHub release. The tag must match `Version` in the
-spec, or the build stops before publishing anything. Run the workflow manually to exercise the build without
-spending a version number.
+Pushing a `v*` tag builds once per EL major in an `almalinux:8`, `:9` and `:10` container. Each leg installs its
+own package, verifies the units and the packaged `ExecStart` path, then all three are attached to one GitHub
+release. The tag must match `Version` in the spec, or the build stops before publishing anything. A failing leg
+does not withhold the others. Run the workflow manually to exercise the builds without spending a version
+number.
 
 ### Installed paths
 

@@ -15,11 +15,23 @@ concurrency:
 
 jobs:
   build:
-    name: Build and verify RPM
+    name: Build and verify RPM (el${{ matrix.el }})
     runs-on: ubuntu-latest
-    # The package is noarch but its dist tag, dependency names and systemd
-    # layout are EL9's, so it is built where it will be installed.
-    container: almalinux:9
+    strategy:
+      # Each release is independently useful, so one broken EL should not
+      # withhold the other two from the release.
+      fail-fast: false
+      matrix:
+        el: [8, 9, 10]
+    # The package is noarch, but the dist tag it carries is not: a package built
+    # on EL9 installs on 8 and 10 while claiming .el9, which misleads anyone
+    # reading `rpm -q` on those hosts. One build per release keeps the tag
+    # honest, and builds each where it will be installed.
+    #
+    # AlmaLinux 10 requires x86-64-v3. Every current GitHub-hosted runner CPU
+    # provides it; a "Fatal glibc error: CPU does not support x86-64-v3" here
+    # means the leg landed on something older, not a packaging fault.
+    container: almalinux:${{ matrix.el }}
     permissions:
       contents: read
     steps:
@@ -137,7 +149,7 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: rpm
+          name: rpm-el${{ matrix.el }}
           path: rpmbuild/RPMS/noarch/*.rpm
           if-no-files-found: error
 
@@ -151,8 +163,12 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: rpm
+          pattern: rpm-el*
+          merge-multiple: true
           path: dist
+
+      - name: List packages to publish
+        run: ls -1 dist/*.rpm
 
       # gh is preinstalled on the runner image, so publishing needs no
       # third-party action and no container.

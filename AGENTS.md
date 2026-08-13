@@ -37,9 +37,9 @@ Ships as a noarch RPM that installs a systemd timer running weekly with `Persist
 The script needs only bash ≥ 4.2, GNU coreutils, GNU findutils (`find -printf`) and `ps`, and assumes homes live
 under `/home`.
 
-The spec builds natively on EL8, EL9 and EL10, each picking up its own dist tag, and the el9 package installs
-and passes on all three: units verify, 25 assertions pass. Releases publish the el9 build. Don't widen the
-claim past EL10 without testing there.
+The spec builds natively on EL8, EL9 and EL10, each picking up its own dist tag. A release ships all three,
+every one built and verified on its own EL: units verify, 25 assertions pass. Don't widen the claim past EL10
+without adding a matrix leg to `release.yml` and proving it there.
 
 ### Layout
 
