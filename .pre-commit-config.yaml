@@ -67,6 +67,6 @@ repos:
   # matches uv.lock / pyproject.toml / uv.toml, so it stays inert until the repo
   # actually grows a Python project.
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: "0.11.32"
+    rev: "0.12.5"
     hooks:
       - id: uv-lock
