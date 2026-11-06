@@ -1,5 +1,12 @@
 name: Claude Code Review
 
+# Editing this file? The action refuses to run when it differs from the copy on
+# the default branch: the PR that edits it gets a green ~3-second "success"
+# skip that installs nothing and reviews nothing, and the change goes live only
+# once it merges. Verify edits on the next PR after merging, or set the
+# vars.CLAUDE_* repo variables, the one lever that changes reviewer behavior
+# immediately.
+
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -31,6 +38,9 @@ jobs:
       actions: read
 
     steps:
+      - name: Clean Claude state
+        run: rm -rf ~/.claude
+
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
@@ -41,6 +51,34 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 24
+
+      # track_progress rewrites the sticky comment into a progress placeholder
+      # the moment the action starts, so the previous round's report is gone
+      # before the reviewer's first step. Snapshot it here; the prompt points
+      # the reviewer at the file. Never worth failing the review over.
+      - name: Save the previous round's review for the reviewer
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # The file exists only when it holds a report, which is what the
+          # prompt promises the reviewer; a failed fetch must not leave an
+          # empty file behind.
+          #
+          # Paginate: an unpaginated read returns the oldest 100 comments, and
+          # the review is the newest. --slurp wraps the pages in an outer array,
+          # hence the `.[][]` flatten, and rules out gh's own --jq, which it
+          # rejects when slurping.
+          body=$(gh api --paginate --slurp \
+            "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments?per_page=100" |
+            jq -r '[.[][] | select(.user.login == "claude[bot]") | .body] | last // ""' || true)
+          if [ -n "$body" ]; then
+            printf '%s\n' "$body" > previous-review.md
+            echo "Snapshotted the previous review ($(wc -c < previous-review.md) bytes)."
+          else
+            echo "No previous claude[bot] comment; the reviewer treats this as round one."
+          fi
 
       - name: Run Claude Code Review
         id: claude-review
@@ -63,54 +101,132 @@ jobs:
           use_sticky_comment: ${{ vars.CLAUDE_USE_STICKY_COMMENT || 'true' }}
           # The plugin `.claude/settings.json` already enables, and the
           # marketplace it comes from, so a CI review and a local session run
-          # the same skill.
+          # the same skill. Both inputs are newline-separated lists: a
+          # comma-joined value is read as one entry, and one bad entry fails
+          # the whole review job.
           plugin_marketplaces: ${{ vars.CLAUDE_PLUGIN_MARKETPLACES || 'https://github.com/anthropics/claude-plugins-official.git' }}
           plugins: ${{ vars.CLAUDE_PLUGINS || 'mattpocock-skills@claude-plugins-official' }}
           # The review runs the same two-axis skill developers run locally, so
           # CI and local reviews apply one standard. The skill only reports; the
           # sticky comment from track_progress is what posts it.
+          # CLAUDE_REVIEW_COMMAND, when set, is the whole command, used
+          # verbatim. It is not a format string. Both notes live out here: YAML
+          # has no comment syntax inside a block scalar, so a `#` line below
+          # would ship to the reviewer as prompt text.
           prompt: |
             ${{ vars.CLAUDE_REVIEW_PROMPT || '' }}
-            # CLAUDE_REVIEW_COMMAND, when set, is the whole command, used
-            # verbatim. It is not a format string.
             ${{ vars.CLAUDE_REVIEW_COMMAND || format('/mattpocock-skills:code-review origin/{0}', github.event.pull_request.base.ref) }}
+
+            Scope the round before dispatching the axes. `previous-review.md`
+            in the working directory, when it exists, is the previous round's
+            full report, snapshotted before this run overwrote the sticky
+            comment. Read it first: it holds what the last round found,
+            advised, and already raised, and its `Reviewed:` line is the
+            anchor, the SHA that round examined. New findings come from the
+            diff since the anchor; the rest of the branch is re-read at
+            blocking severity only. A file with no `Reviewed:` line is a
+            failed round's stub rather than a report, so anchor on the SHA it
+            records, if it names one. Review the whole branch diff when there
+            is no file, when neither yields an anchor, or when the anchor is
+            no longer an ancestor of HEAD (the branch was rebased).
 
             For the Spec axis, the spec is the GitHub issue this pull request
             closes. Find it with
-            `gh pr view ${{ github.event.pull_request.number }} --json title,body,closingIssuesReferences`,
-            then read each referenced issue with `gh issue view <number> --comments`.
-            When the PR closes no issue, fall back to its own description. If
-            neither states what was asked for, report the spec as unavailable
-            rather than inferring it from the diff.
+            `gh pr view ${{ github.event.pull_request.number }} --json title,body,closingIssuesReferences`
+            and read it with `gh issue view <number> --json title,body,comments`.
+            When the PR closes no issue, the spec is the PR's own description;
+            treat description-vs-code drift as non-blocking then, because the
+            description is author-written, not an independent spec. If neither
+            states what was asked for, report the spec as unavailable rather
+            than inferring it from the diff.
 
             The skill's rule about skipping what tooling already enforces
-            applies to the pre-commit check on this PR, this repo's only gate:
-            markdownlint, gitleaks, addlicense, shellcheck, ruff, the uv lock
-            hook and the file hygiene hooks. Don't re-run them and don't report
-            what they already catch. Review what they can't.
+            covers every other check on this PR. Read them through the
+            `github_ci` MCP server: `get_ci_status` is the live list, and
+            `get_workflow_run_details` and `download_job_log` reach the logs.
+            The `gh` route to the same facts (`gh pr checks`, `gh run list`)
+            answers `Resource not accessible by integration` under the token
+            the action hands you, whatever this job's `permissions:` block
+            grants, so an attempt there is a wasted turn. Those results and
+            logs are evidence you may read, at most once each: a check still
+            running when you look is unavailable this round, and a check's
+            pass or fail state is the PR's own to show, not a review finding.
 
-            One exception. shellcheck is gated at `--severity=warning`, so
-            note and info level shell findings are yours to report, not the
-            hook's. `.pre-commit-config.yaml` records the five notes that are
-            accepted standing; a new one in changed code is worth raising.
+            Reviewing means reading. Evidence comes from the diff, the repo,
+            git history, and those check logs. The toolchain (building,
+            linting, running tests, writing scratch tests to probe behavior)
+            belongs to the checks above, and this run's permission rules deny
+            it, so an attempt is a wasted turn: answer behavior questions by
+            reading the source. Write each shell command as one literal
+            command or pipeline, every argument spelled out, run from the
+            working directory, which is already the checkout root, on paths
+            inside the checkout. Anything else is a wasted turn too, because
+            the permission checker refuses it whatever the allowlist says. You
+            are on a CI runner, not on a deployment target. What happens to be
+            installed here says nothing about the hosts this code runs on, so
+            answer dependency and version questions from the repo's manifests
+            and lockfiles, and read a dependency's source from its upstream
+            repository at the pinned version, with
+            `gh api 'repos/OWNER/REPO/contents/PATH?ref=TAG' -H 'Accept: application/vnd.github.raw'`
+            or WebFetch. Sub-agents see none of these instructions, so carry
+            this paragraph into every sub-agent prompt verbatim.
 
-            You can read that check's result and logs for this PR. Use that to
-            see what it already caught, so you can skip it. Its pass or fail
-            state is not a review finding, and the PR already shows it.
+            The skill's two sub-agents, one per axis, are the whole fan-out,
+            however large the diff. A Standards pass too large to read
+            everything reviews the riskiest files in full and the rest at
+            blocking severity only.
 
-            This review runs alongside that check and outlasts it, so it may
-            still be running when you look. Read its result at most once, never
-            wait for it to finish, and never re-poll it. Review the diff on what
-            you have.
+            Report under this contract. Where its layout differs from the
+            skill's side-by-side aggregation, the contract wins; keep each
+            finding labeled with its axis.
+
+            - Open with two lines: `Reviewed: ${{ github.event.pull_request.head.sha }}`
+              and `Verdict: mergeable` or `Verdict: not mergeable`. The verdict
+              is not mergeable only when a blocking finding exists: behavior
+              that is wrong, an acceptance criterion not met, data lost or
+              corrupted, or a security hole. Style, naming, structure smells,
+              and prose accuracy are never blocking.
+            - Itemize blocking findings first. Everything non-blocking goes in
+              one collapsed <details> section, grouped one entry per class of
+              finding with its instances listed inside it.
+            - Account for every blocking finding the previous round reported:
+              fixed, still open, or withdrawn.
+            - A finding the PR description records as declined with reasoning
+              may be re-raised only with a rebuttal that quotes the reasoning
+              and says why it fails; without a rebuttal, leave it out. Advice
+              a previous round gave and the author took stays given: reversing
+              it requires naming the reversal and what changed.
+            - Bound prose findings. Ask for the invariant, not the figure:
+              prose states the relationship, and a test owns the number. A
+              figure in prose that drifts from what a test asserts is one
+              class-level non-blocking finding however many instances exist.
+              Deleting stale prose is a valid fix; ask for deleted prose back
+              only when a spec criterion requires the statement.
+            - Flag scope creep once: creep the description already discloses
+              and a previous round already flagged is settled.
           # The reviewer investigates; it does not re-run the checks. A compound
           # command is denied whole if any part of it is unlisted, so the
           # pipeline tails (head, wc, sort, cut, echo, ...) have to be listed
           # too: without them a permitted `grep` still dies on its `| head`.
+          # diff and mkdir are listed because refactor reviews compare a file's
+          # pre-move version against its new home, and /tmp writes are blocked,
+          # so the scratch copies need a directory inside the workspace.
+          # awk is listed because Claude Code refuses any awk program that runs
+          # commands (system(), a pipe, getline) even under this rule. Without
+          # that check awk would be code execution, like python3.
           # Deliberately absent: python3, because it is arbitrary code execution
-          # and jq covers the JSON parsing it gets reached for; and pre-commit,
-          # because it runs as its own check and the prompt says to skip it. Add
-          # an entry when a denied command costs the reviewer a fact it then
-          # reports as uncertainty.
-          claude_args: ${{ vars.CLAUDE_ARGS || format('--model {0} --allowedTools "Skill,Task,Agent,WebFetch,WebSearch,Bash(gh:*),Bash(git:*),Bash(jq:*),Bash(grep:*),Bash(rg:*),Bash(find:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(sort:*),Bash(uniq:*),Bash(cut:*),Bash(sed:*),Bash(echo:*),Bash(shellcheck:*),Bash(rpmspec:*)"', vars.CLAUDE_MODEL || 'claude-opus-5') }}
+          # and jq covers the JSON parsing it gets reached for; and the linters,
+          # builders, and test runners, because they run as their own checks
+          # and a review that reaches for them burns its 30 minutes compiling.
+          # Add an entry when a denied command costs the reviewer a fact it
+          # then reports as uncertainty.
+          # Write and Edit are disallowed, not just unlisted: a reviewer writes
+          # nothing, and allowedTools alone has not stopped a reviewer writing
+          # a scratch test into the tree (posting is unaffected: reviews post
+          # via the action's MCP comment tool).
+          # `opus` is Claude Code's alias for the newest Opus it knows, so the model
+          # moves to a new Opus when the action's Claude Code does. A pinned ID newer
+          # than the installed Claude Code runs under an older model's rules.
+          claude_args: ${{ vars.CLAUDE_ARGS || format('--model {0} --allowedTools "Skill,Task,Agent,WebFetch,WebSearch,Bash(gh:*),Bash(git:*),Bash(jq:*),Bash(grep:*),Bash(rg:*),Bash(find:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(sort:*),Bash(uniq:*),Bash(cut:*),Bash(sed:*),Bash(awk:*),Bash(echo:*),Bash(diff:*),Bash(mkdir:*),Bash(rpmspec:*)" --disallowedTools "Write,Edit,NotebookEdit"', vars.CLAUDE_MODEL || 'opus') }}
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
